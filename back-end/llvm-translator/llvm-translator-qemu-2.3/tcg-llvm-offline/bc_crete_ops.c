@@ -1,5 +1,8 @@
 #include "stdint.h"
 
+void crete_enable_fork();
+void crete_disable_fork();
+
 struct CPUStateElement
 {
     uint32_t m_offset;
@@ -54,10 +57,14 @@ __attribute__((noinline)) static void internal_crete_sync_memory(const struct Me
 void crete_sync_cpu_state(uint8_t *cpu_state, uint32_t cs_size,
         const struct CPUStateElement *sync_table, uint32_t st_size)
 {
+    crete_disable_fork();
     internal_sync_cpu_state(cpu_state, cs_size, sync_table, st_size);
+    crete_enable_fork();
 }
 
 void crete_sync_memory(const struct MemoryElement *sync_table, uint32_t st_size)
 {
+    crete_disable_fork();
     internal_crete_sync_memory(sync_table, st_size);
+    crete_enable_fork();
 }
