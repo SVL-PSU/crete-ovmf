@@ -2,6 +2,8 @@
 
 void crete_enable_fork();
 void crete_disable_fork();
+void crete_enable_symbolic_execution();
+void crete_disable_symbolic_execution();
 
 struct CPUStateElement
 {
