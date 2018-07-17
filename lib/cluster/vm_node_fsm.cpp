@@ -184,7 +184,6 @@ public:
     struct store_trace;
     struct report_error;
     struct connect_vm;
-    struct receive_guest_info;
     struct finish;
     struct terminate;
 
@@ -243,7 +242,7 @@ public:
                                                                                                    And_<has_next_target,
                                                                                                         is_first_vm>>>    >,
     //   +------------------+------------------+------------------+---------------------+------------------+
-      Row<RxGuestData       ,ev::poll          ,GuestDataRxed     ,receive_guest_info   ,is_prev_task_finished>,
+      Row<RxGuestData       ,ev::poll          ,GuestDataRxed     ,none                 ,is_prev_task_finished>,
     //   +------------------+------------------+------------------+---------------------+------------------+
       Row<GuestDataRxed     ,ev::poll          ,NextTest          ,none                 ,none                 >,
     //   +------------------+------------------+------------------+---------------------+------------------+
@@ -271,7 +270,6 @@ private:
     boost::thread image_updater_thread_;
     std::shared_ptr<fs::path> trace_{std::make_shared<fs::path>()}; // To be read when is_flag_active<trace_ready>() == true.
     std::shared_ptr<AtomicGuard<bp::child>> child_{std::make_shared<AtomicGuard<bp::child>>(-1, bp::detail::file_handle(), bp::detail::file_handle(), bp::detail::file_handle())};
-    std::shared_ptr<Server> server_{std::make_shared<Server>()}; // Ctor acquires unique port.
     bool first_vm_{false};
     GuestData guest_data_;
     TestCase initial_test_;
@@ -793,16 +791,23 @@ struct QemuFSM_::start_test
 
         write_serialized(ofs, ev.tc_);
 
-        try
+        // TODO: xxx new way to inform test case ready
         {
-            fsm.server_->write(0,
-                               packet_type::cluster_next_test);
-            fsm.test_start_time_ = std::chrono::system_clock::now();
+            fs::path file_tc_ready = hostfile / "tc_ready";
+            if(fs::exists(file_tc_ready))
+            {
+                BOOST_THROW_EXCEPTION(Exception{} << err::msg{"[CRETE ERROR] 'tc_ready' exists when start a new test case.\n"});
+            }
+
+            std::ofstream ofs{file_tc_ready.string().c_str()};
+            if(!ofs.good())
+            {
+                BOOST_THROW_EXCEPTION(Exception{} << err::file{file_tc_ready.string()});
+            }
+            ofs.close();
         }
-        catch(std::exception& e)
-        {
-            BOOST_THROW_EXCEPTION(VMException{} << err::msg{boost::diagnostic_information(e)});
-        }
+
+        fsm.test_start_time_ = std::chrono::system_clock::now();
     }
 };
 
@@ -949,8 +954,6 @@ struct QemuFSM_::store_trace
             fs::rename(original_trace,
                        *trace);
 
-            *guest_data_post_exec = read_serialized_guest_data_post_exec((*trace) / CRETE_FILENAME_GUEST_DATA_POST_EXEC);
-
             translate_trace(*trace, dispatch_options, node_options,child_pid);
 
             fs::remove(trace_ready);
@@ -978,11 +981,8 @@ struct QemuFSM_::connect_vm
     template <class EVT,class FSM,class SourceState,class TargetState>
     auto operator()(EVT const&, FSM& fsm, SourceState&, TargetState& ts) -> void
     {
-        ts.async_task_.reset(new AsyncTask{[](std::shared_ptr<Server> server,
-                                              const fs::path vm_dir,
-                                              const bool distributed,
-                                              const std::string target,
-                                              std::shared_ptr<AtomicGuard<bp::child>> child)
+        // Only check whether vm is running or not
+        ts.async_task_.reset(new AsyncTask{[](std::shared_ptr<AtomicGuard<bp::child>> child)
         {
             auto lock = child->acquire();
             auto pid = lock->get_id();
@@ -991,91 +991,8 @@ struct QemuFSM_::connect_vm
             {
                 BOOST_THROW_EXCEPTION(VMException{} << err::process_exited{"pid_"});
             }
-
-            auto new_port = server->port();
-
-            std::cout << "new_port: " << new_port << std::endl;
-
-            auto port_file_path = vm_dir / hostfile_dir_name / vm_port_file_name;
-
-            {
-                // Assumes crete-runner continuously checks until the file is created.
-                fs::ofstream ofs(port_file_path,
-                                 std::ios_base::out | std::ios_base::binary);
-
-                ofs << new_port;
-            }
-
-            // TODO: should actually continously check if the VM has terminated while waiting, or have a timeout.
-            server->open_connection_wait();
-
-            std::cout << "after: fsm.server_.open_connection_wait()" << std::endl;
-
-            // Remove the path immediately upon connection, so it isn't used erroneously in the future.
-            // I.e., next time crete-run attempts to connect.
-            fs::remove(port_file_path);
-
-            try
-            {
-                auto pkinfo = PacketInfo{0,0,0};
-
-                // TODO: break into logical component functions: connect, write_config, read_guest_config.
-                // TODO: send configuration data. Right now, just send target.
-                pkinfo.type = packet_type::cluster_config;
-                write_serialized_text(*server,
-                                      pkinfo,
-                                      distributed);
-
-                if(distributed)
-                {
-                    pkinfo.type = packet_type::cluster_next_target;
-                    write_serialized_text(*server,
-                                          pkinfo,
-                                          target);
-                }
-                std::cout << "after: packet_type::cluster_next_target" << std::endl;
-            }
-            catch(std::exception& e)
-            {
-                BOOST_THROW_EXCEPTION(VMException{} << err::msg{boost::diagnostic_information(e)});
-            }
-
-            // TODO: As I don't need to send the guest config for every instance (they're all the same),
-            //       do I actually need this? Only for the first instance to run.
-            //       However, I do want one to receive one thing consistently: the proc-maps. I need
-            //       proc-maps for a sanity check, to ensure all vm-inst proc-maps are consistent.
-            //       So, what I can do is provide an optional state to enter if it's the first
-            //       vm to get the the run_config info. Otherwise, always get the info.
-            // TODO: Any reason to actually use RunConfiguration here? Seems I can just send the buffer on to Dispatch...
-            //    config::RunConfiguration rc;
-            //    boost::asio::streambuf sbuf;
-            //    read_serialized_binary(*server_,
-            //                           sbuf);
         },
-        fsm.server_,
-        fsm.vm_dir_,
-        fsm.dispatch_options_.mode.distributed,
-        fsm.target_,
         fsm.child_});
-    }
-};
-
-struct QemuFSM_::receive_guest_info
-{
-    template <class EVT,class FSM,class SourceState,class TargetState>
-    auto operator()(EVT const&, FSM& fsm, SourceState&, TargetState&) -> void
-    {
-        try
-        {
-            // Perform any work needed only by the first VM instance s.a. grabbing the guest config, any debug info.
-            read_serialized_text(*fsm.server_,
-                                 fsm.guest_data_.guest_config,
-                                 packet_type::guest_configuration);
-        }
-        catch(std::exception& e)
-        {
-            BOOST_THROW_EXCEPTION(VMException{} << err::msg{boost::diagnostic_information(e)});
-        }
     }
 };
 

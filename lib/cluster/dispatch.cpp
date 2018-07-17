@@ -1621,7 +1621,7 @@ struct DispatchFSM_::dispatch
                         }
                         else
                         {
-                            fsm.test_pool_.insert_initial_tc_from_config(extract_initial_test(fsm.guest_data_.guest_config));
+                            fsm.test_pool_.insert_initial_tc_from_config(TestCase());
                         }
                     }
                     else
