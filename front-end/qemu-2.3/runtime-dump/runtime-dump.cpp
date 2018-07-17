@@ -1805,6 +1805,9 @@ void crete_pre_cpu_tb_exec(void *qemuCpuState, TranslationBlock *tb)
     if(!g_crete_is_valid_target_pid)
     {
         CRETE_BDMD_DBG(crete_pre_finished = true;);
+
+        f_crete_enabled = false;
+        static_flag_interested_tb = false;
         return;
     }
 
@@ -1921,6 +1924,9 @@ int crete_post_cpu_tb_exec(void *qemuCpuState, TranslationBlock *input_tb, uint6
     if(!g_crete_is_valid_target_pid)
     {
         CRETE_BDMD_DBG(crete_post_finished = true;);
+        if(static_flag_interested_tb)
+            --rt_dump_tb_count;
+
         return 0;
     }
 
