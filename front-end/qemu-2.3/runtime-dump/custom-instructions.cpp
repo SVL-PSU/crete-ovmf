@@ -21,6 +21,7 @@ void qemu_system_shutdown_request(void);
 #include "tcg.h"
 
 using namespace std;
+namespace fs = boost::filesystem;
 
 // shared from runtime-dump.cpp
 extern uint64_t g_crete_target_pid;
@@ -37,6 +38,24 @@ static boost::unordered_set<uint64_t> g_pc_include_filters;
 
 static uint64_t target_process_count = 0;
 static set<string> concolics_names;
+
+static inline void crete_custom_instr_wait_test_case()
+{
+    fs::path tc_ready = "./hostfile/tc_ready";
+    // check whether test case is available
+    if(fs::exists(tc_ready))
+    {
+        target_ulong addr = g_cpuState_bct->regs[R_EAX];
+        uint8_t ret = 1;
+
+        if(RuntimeEnv::access_guest_memory(g_cpuState_bct, addr, &ret, 1, 1) != 0) {
+            cerr << "[CRETE ERROR] access_guest_memory() failed in crete_custom_instr_wait_test_case()\n";
+            assert(0);
+        }
+
+        fs::remove(tc_ready);
+    }
+}
 
 // CRETE_INSTR_SEND_TARGET_PID_VALUE
 static inline void crete_custom_instr_sent_target_pid()
@@ -158,31 +177,6 @@ static inline void crete_custom_instr_pre_make_concolic()
     runtime_env->handlecreteMakeConcolic(concolic_name, guest_addr, size);
 }
 
-// CRETE_INSTR_KERNEL_OOPS_VALUE
-// TODO: xxx make it better with keeping traces so far
-// Report with prints and quit VM, from where vm-node should log the
-// VM quit with related information and test case
-static inline void crete_custom_instr_kernel_oops()
-{
-    fprintf(stderr, "[Potential Bugs] crete_kernel_oops()\n");
-    qemu_system_shutdown_request();
-}
-
-// CRETE_INSTR_PRIME_VALUE:
-// Reset flags and structs being used for testing an executable
-static inline void crete_custom_instr_prime()
-{
-    g_pc_include_filters.clear();
-    g_pc_exclude_filters.clear();
-
-#if defined(CRETE_DBG_MEM)
-    fprintf(stderr, "[CRETE_DBG_MEM] memory usage(crete_custom_instr_prime()) = %.3fMB\n",
-            crete_mem_usage());
-#endif
-}
-
-namespace fs = boost::filesystem;
-
 // CRETE_INSTR_DUMP_VALUE
 static inline void crete_tracing_finish()
 {
@@ -226,71 +220,15 @@ static inline void crete_tracing_reset()
     crete_tci_next_iteration();
 }
 
-// CRETE_INSTR_EXCLUDE_FILTER_VALUE
-static inline void crete_custom_instr_exclude_filter()
-{
-	// Note: using ecx/eax is safe for 64bit, as regs[] is defined as target_ulong, and there's no R_RCX/R_RAX
-    target_ulong addr_begin = g_cpuState_bct->regs[R_EAX];
-    target_ulong addr_end = g_cpuState_bct->regs[R_ECX];
-
-    for(uint64_t i = addr_begin; i < addr_end; ++i) {
-        g_pc_exclude_filters.insert(i);
-    }
-}
-
-// CRETE_INSTR_INCLUDE_FILTER_VALUE
-static inline void crete_custom_instr_inlude_filter()
-{
-	// Note: using ecx/eax is safe for 64bit, as regs[] is defined as target_ulong, and there's no R_RCX/R_RAX
-    target_ulong addr_begin = g_cpuState_bct->regs[R_EAX];
-    target_ulong addr_end = g_cpuState_bct->regs[R_ECX];
-
-    for(uint64_t i = addr_begin; i < addr_end; ++i) {
-        g_pc_include_filters.insert(i);
-    }
-}
-
-
-// CRETE_INSTR_READ_PORT_VALUE
-//NOTE: xxx check whether port is valid on client side
-static void crete_custom_instr_read_port()
-{
-	target_ulong guest_addr = g_cpuState_bct->regs[R_EAX];
-	target_ulong size = g_cpuState_bct->regs[R_ECX];
-
-	unsigned short port = 0;
-
-	const char* file_path = "hostfile/port";
-
-	if(fs::exists(file_path))
-	{
-	    fs::ifstream ifs(file_path,
-	            std::ios_base::in | std::ios_base::binary);
-
-	    assert(ifs.good());
-
-	    ifs >> port;
-	}
-
-	assert(size == sizeof(port));
-
-	if(RuntimeEnv::access_guest_memory(g_cpuState_bct, guest_addr,
-	        (uint8_t *)(&port), size, 1) != 0) {
-
-	    cerr << "[CRETE ERROR] access_guest_memory() failed\n";
-	    assert(0);
-	}
-}
-
 void crete_custom_instruction_handler(uint64_t arg) {
 	switch (arg) {
-	case CRETE_INSTR_READ_PORT_VALUE:
-	    crete_custom_instr_read_port();
+	// xxx: to be removed
+	case CRETE_INSTR_PRIME_VALUE:
+	    crete_tracing_reset();
 	    break;
 
-	case CRETE_INSTR_PRIME_VALUE:
-	    crete_custom_instr_prime();
-	    crete_tracing_reset();
+	case CRETE_INSTR_WAIT_TEST_CASE_VALUE:
+	    crete_custom_instr_wait_test_case();
 	    break;
 
 	case CRETE_INSTR_SEND_TARGET_PID_VALUE:
@@ -313,25 +251,9 @@ void crete_custom_instruction_handler(uint64_t arg) {
 	    crete_custom_instr_pre_make_concolic();
 	    break;
 
-	case CRETE_INSTR_KERNEL_OOPS_VALUE:
-	    crete_custom_instr_kernel_oops();
-	    break;
-
 	case CRETE_INSTR_DUMP_VALUE:
 	    crete_tracing_finish();
 	    crete_tracing_reset();
-	    break;
-
-	case CRETE_INSTR_EXCLUDE_FILTER_VALUE: // Exclude filter
-	    crete_custom_instr_exclude_filter();
-	    break;
-
-	case CRETE_INSTR_INCLUDE_FILTER_VALUE: // Include filter
-	    crete_custom_instr_inlude_filter();
-	    break;
-
-	case CRETE_INSTR_QUIT_VALUE:
-	    qemu_system_shutdown_request();
 	    break;
 // Add new custom instruction handler here
 
@@ -339,27 +261,6 @@ void crete_custom_instruction_handler(uint64_t arg) {
 	    assert(0 && "illegal operation: unsupported op code\n");
 	}
 }
-
-int crete_is_pc_in_exclude_filter_range(uint64_t pc)
-{
-    boost::unordered_set<uint64_t>::const_iterator it = g_pc_exclude_filters.find(pc);
-    if(it != g_pc_exclude_filters.end()){
-        return 1;
-    } else {
-        return 0;
-    }
-}
-
-int crete_is_pc_in_include_filter_range(uint64_t pc)
-{
-    boost::unordered_set<uint64_t>::const_iterator it = g_pc_include_filters.find(pc);
-    if(it != g_pc_include_filters.end()){
-        return 1;
-    } else {
-        return 0;
-    }
-}
-
 struct PIDWriter
 {
     PIDWriter()

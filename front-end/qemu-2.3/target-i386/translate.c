@@ -4655,12 +4655,6 @@ static target_ulong disas_insn(CPUX86State *env, DisasContext *s,
             case CRETE_INSTR_MAKE_CONCOLIC_INTERNAL_VALUE:
                 gen_helper_crete_make_concolic_internal(cpu_regs[R_EAX], cpu_regs[R_ECX], cpu_regs[R_EDX]);
                 break;
-            case CRETE_INSTR_ASSUME_BEGIN_VALUE:
-                gen_helper_crete_assume_begin();
-                break;
-            case CRETE_INSTR_ASSUME_VALUE:
-                gen_helper_crete_assume(cpu_regs[R_EAX]);
-                break;
             }
 #else
             /* Simply skip the opcode when building vanilla qemu */
