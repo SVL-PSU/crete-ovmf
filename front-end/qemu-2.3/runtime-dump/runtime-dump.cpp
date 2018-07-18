@@ -1682,7 +1682,7 @@ void RuntimeEnv::handleCreteVoidTargetPid()
 
 void RuntimeEnv::addOvmfPc(uint64_t tb_pc)
 {
-    m_ovmf_pc.push_back(tb_pc);
+    m_ovmf_pc.insert(tb_pc);
 }
 
 CreteFlags::CreteFlags()

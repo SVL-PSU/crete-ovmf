@@ -295,7 +295,7 @@ private:
     void *m_dbg_cpuState_post_interest;
 
     // For ovmf coverage
-    vector<uint64_t> m_ovmf_pc;
+    set<uint64_t> m_ovmf_pc;
 
 public:
 	RuntimeEnv();

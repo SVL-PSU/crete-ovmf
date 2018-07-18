@@ -14,6 +14,7 @@
 
 #include <boost/filesystem/path.hpp>
 #include <boost/serialization/vector.hpp>
+#include <boost/serialization/set.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 
 using namespace std;
@@ -26,7 +27,7 @@ namespace crete
 struct GuestDataPostExec
 {
     vector<uint64_t> m_new_captured_tbs;
-    vector<uint64_t> m_ovmf_pc;
+    set<uint64_t> m_ovmf_pc;
     uint64_t m_tc_issue_index;
 
     GuestDataPostExec() {};
@@ -47,7 +48,7 @@ struct GuestDataPostExec
         m_new_captured_tbs.push_back(pc);
     }
 
-    void set_ovmf_pc(const vector<uint64_t>& input)
+    void set_ovmf_pc(const set<uint64_t>& input)
     {
         m_ovmf_pc = input;
     }
