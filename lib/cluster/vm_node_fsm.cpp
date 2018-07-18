@@ -588,7 +588,7 @@ struct QemuFSM_::clean
 
         fs::remove_all(ev.vm_dir_ / log_dir_name);
         fs::remove(hostfile_dir / input_args_name);
-        fs::remove(hostfile_dir / trace_ready_name);
+        fs::remove(hostfile_dir / "tc_ready");
 
         if(ev.dispatch_options_.mode.distributed)
         {
@@ -705,10 +705,6 @@ struct QemuFSM_::start_vm
             }
 
             auto args = std::vector<std::string>{fs::absolute(exe).string() // It appears our modified QEMU requires full path in argv[0]...
-                                ,"-hda"
-                                ,image_name
-                                ,"-loadvm"
-                                ,dispatch_options.vm.snapshot
                                 };
 
             auto add_args = std::vector<std::string>{};
