@@ -954,6 +954,8 @@ struct QemuFSM_::store_trace
             fs::rename(original_trace,
                        *trace);
 
+            *guest_data_post_exec = read_serialized_guest_data_post_exec((*trace) / CRETE_FILENAME_GUEST_DATA_POST_EXEC);
+
             translate_trace(*trace, dispatch_options, node_options,child_pid);
 
             fs::remove(trace_ready);
