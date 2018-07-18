@@ -1658,6 +1658,9 @@ void RuntimeEnv::add_new_tb_pc(const uint64_t current_tb_pc)
 
 void RuntimeEnv::writeGuestDataPostExec()
 {
+    m_guest_data_post_exec.set_ovmf_pc(m_ovmf_pc);
+    m_guest_data_post_exec.set_tc_issue_index(m_input_tc.get_issue_index());
+
     ofstream o_sm(getOutputFilename(CRETE_FILENAME_GUEST_DATA_POST_EXEC).c_str(),
             ios_base::binary);
     assert(o_sm.good());
@@ -1675,6 +1678,11 @@ void RuntimeEnv::handleCreteVoidTargetPid()
 {
     m_interrupt_process_info.first = false;
     crete_analyzer_void_target_pid(KERNEL_CODE_START_ADDR);
+}
+
+void RuntimeEnv::addOvmfPc(uint64_t tb_pc)
+{
+    m_ovmf_pc.push_back(tb_pc);
 }
 
 CreteFlags::CreteFlags()
@@ -1823,6 +1831,11 @@ void crete_pre_cpu_tb_exec(void *qemuCpuState, TranslationBlock *tb)
     }
 
     f_crete_enabled = is_target_pid && !is_processing_interrupt;
+
+    if(f_crete_enabled)
+    {
+        runtime_env->addOvmfPc(tb->pc);
+    }
 
     // 4. the current tb is pre-interested, if f_crete_enabled and pass manual code selection
     bool tb_pre_interested = f_crete_enabled && manual_code_selection_pre_exec(tb);

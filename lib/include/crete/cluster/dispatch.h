@@ -27,6 +27,7 @@ const auto dispatch_trace_dir_name = std::string{"trace"};
 const auto dispatch_test_case_dir_name = std::string{"test-case"};
 const auto dispatch_profile_dir_name = std::string{"profile"};
 const auto dispatch_guest_data_dir_name = std::string{"guest-data"};
+const auto dispatch_ovmf_dir_name = std::string{"ovmf"};
 const auto dispatch_guest_config_file_name = std::string{"crete-guest-config.serialized"};
 const auto dispatch_log_finish_file_name = std::string{"finish.log"};
 const auto dispatch_log_test_case_tree_file_name = std::string{"test_case_tree.log"};

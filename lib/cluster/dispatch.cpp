@@ -1180,6 +1180,8 @@ public:
     auto set_update_time_last_new_tb(const GuestDataPostExec& data) -> void;
     auto no_new_tb_time() -> uint64_t;
 
+    auto write_ovmf_pc(const GuestDataPostExec& data) -> void;
+
     // +--------------------------------------------------+
     // + Entry & Exit                                     +
     // +--------------------------------------------------+
@@ -1566,6 +1568,7 @@ struct DispatchFSM_::dispatch
                     {
                         fsm.to_trace_pool(nfsm->get_trace());
                         fsm.set_update_time_last_new_tb(nfsm->get_guest_data_post_exec());
+                        fsm.write_ovmf_pc(nfsm->get_guest_data_post_exec());
                     }
                 }
                 else if(nfsm->is_flag_active<vm::flag::tx_test>())
@@ -2002,6 +2005,27 @@ auto DispatchFSM_::set_update_time_last_new_tb(const GuestDataPostExec& data) ->
     }
 }
 
+auto DispatchFSM_::write_ovmf_pc(const GuestDataPostExec& data) -> void
+{
+
+    auto p = root_ / dispatch_ovmf_dir_name / ("issued_tc_" + std::to_string(data.m_tc_issue_index) + ".txt");
+
+    fs::ofstream ofs{p};
+
+    if(!ofs.good())
+    {
+        BOOST_THROW_EXCEPTION(Exception{} << err::file_open_failed{p.string()});
+    }
+
+    for(auto it = data.m_ovmf_pc.begin(), ite = data.m_ovmf_pc.end();
+            it != ite; ++it) {
+        ofs << "0x" << setfill('0') << setw(8) << hex << *it << endl;
+    }
+
+    ofs.close();
+}
+
+
 auto DispatchFSM_::test_pool() -> TestPool&
 {
     return test_pool_;
@@ -2096,7 +2120,8 @@ auto DispatchFSM_::set_up_root_dir() -> void
         create_root_dirs({dispatch_trace_dir_name,
                           dispatch_test_case_dir_name,
                           dispatch_profile_dir_name,
-                          dispatch_guest_data_dir_name});
+                          dispatch_guest_data_dir_name,
+                          dispatch_ovmf_dir_name});
         create_log_dirs({dispatch_log_vm_dir_name,
                          dispatch_log_svm_dir_name});
     }

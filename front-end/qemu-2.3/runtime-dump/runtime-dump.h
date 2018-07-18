@@ -294,6 +294,9 @@ private:
     //
     void *m_dbg_cpuState_post_interest;
 
+    // For ovmf coverage
+    vector<uint64_t> m_ovmf_pc;
+
 public:
 	RuntimeEnv();
 	~RuntimeEnv();
@@ -373,6 +376,9 @@ public:
 
     void set_dbgCPUStatePostInterest(const void *cpuState);
     void check_dbgCPUStatePostInterest(const void *cpuState);
+
+    // For ovmf coverage
+    void addOvmfPc(uint64_t tb_pc);
 
 private:
     void init_concolics();
