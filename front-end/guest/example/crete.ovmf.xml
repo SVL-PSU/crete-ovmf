@@ -1,0 +1,39 @@
+<crete>
+	<mode>distributed</mode>
+	<vm>
+		<arch>x64</arch>
+		<args>-pflash ./OVMF.fd -hda fat:myHda -monitor telnet:127.0.0.1:1234,server,nowait</args>
+		<snapshot>test</snapshot>
+		<image>
+			<update>false</update>
+			<path>to-be-removed</path>
+		</image>
+	</vm>
+	<svm>
+		<args>
+			<symbolic>
+                          --search=dfs
+                          --check-overshift=false
+                          --use-cex-cache
+                          --use-forked-solver
+                          --simplify-sym-indices
+                          --max-time=90.
+                          --max-instruction-time=5.
+			  --max-memory=2000
+			</symbolic>
+		</args>
+	</svm>
+	<test>
+		<interval>
+			<!-- <time>900</time> -->
+			<!-- <trace>1</trace> -->
+                        <new_inst_wait_time>300</new_inst_wait_time>
+		</interval>
+		<items>
+                  <item>ovmf</item>
+	        </items>
+	</test>
+	<profile>
+		<interval>1000</interval>
+	</profile>
+</crete>
