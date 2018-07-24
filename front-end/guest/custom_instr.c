@@ -167,22 +167,19 @@ char crete_wait_test_case(void)
     return ret;
 }
 
-void crete_init(void)
+void crete_ovmf_init(void)
 {
+    while(!crete_wait_test_case());
+
     __asm__ __volatile__(
             CRETE_INSTR_PRIME()
     );
+
+    crete_send_target_pid();
 }
 
-void crete_iteration_begin(void)
+void crete_ovmf_finish(void)
 {
-  while(!crete_wait_test_case());
-
-  crete_send_target_pid();
-}
-
-void crete_iteration_end(void)
-{
-  crete_void_target_pid();
-  crete_send_custom_instr_dump();
+    crete_void_target_pid();
+    crete_send_custom_instr_dump();
 }
