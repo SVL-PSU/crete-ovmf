@@ -190,6 +190,20 @@ struct QemuInterruptInfo {
     }
 };
 
+class BlockLoopDetector
+{
+    friend RuntimeEnv;
+private:
+    uint64_t m_last_pc;
+    uint64_t m_repeated_count;
+
+public:
+    BlockLoopDetector();
+    ~BlockLoopDetector();
+
+    bool check(uint64_t current_pc);
+};
+
 // <address, value>
 typedef boost::unordered_map<uint64_t, uint8_t> memoSyncTable_ty;
 typedef vector<memoSyncTable_ty> memoSyncTables_ty;
@@ -296,6 +310,7 @@ private:
 
     // For ovmf coverage
     set<uint64_t> m_ovmf_pc;
+    BlockLoopDetector m_bld;
 
 public:
 	RuntimeEnv();
@@ -379,6 +394,7 @@ public:
 
     // For ovmf coverage
     void addOvmfPc(uint64_t tb_pc);
+    bool checkBlockLoop(uint64_t tb_pc);
 
 private:
     void init_concolics();

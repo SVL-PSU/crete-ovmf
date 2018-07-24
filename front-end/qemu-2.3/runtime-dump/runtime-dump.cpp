@@ -1685,6 +1685,45 @@ void RuntimeEnv::addOvmfPc(uint64_t tb_pc)
     m_ovmf_pc.insert(tb_pc);
 }
 
+bool RuntimeEnv::checkBlockLoop(uint64_t tb_pc)
+{
+    return m_bld.check(tb_pc);
+}
+
+
+BlockLoopDetector::BlockLoopDetector()
+:m_last_pc(0),m_repeated_count(0)
+{
+    ;
+}
+
+BlockLoopDetector::~BlockLoopDetector()
+{
+    ;
+}
+
+
+// xxx: todo the bound here is arbitrary
+static const uint32_t CRETE_BLD_BOUND = 100;
+
+bool BlockLoopDetector::check(uint64_t current_pc)
+{
+    bool ret = true;
+    if(current_pc == m_last_pc)
+    {
+        ++m_repeated_count;
+        if(m_repeated_count > CRETE_BLD_BOUND)
+        {
+            ret = false;
+        }
+    } else {
+        m_last_pc = current_pc;
+        m_repeated_count = 0;
+    }
+
+    return ret;
+}
+
 CreteFlags::CreteFlags()
 : m_cpuState(NULL), m_tb(NULL),
   m_target_pid(0), m_capture_started(false),
@@ -2783,6 +2822,8 @@ static bool manual_code_selection_pre_exec(TranslationBlock *tb)
     // 1. check for user_code
 //    bool is_user_code = (tb->pc < KERNEL_CODE_START_ADDR);
 //    passed = passed && is_user_code;
+
+    passed = passed && runtime_env->checkBlockLoop(tb->pc);
 
     return passed;
 }
