@@ -194,11 +194,16 @@ class BlockLoopDetector
 {
     friend RuntimeEnv;
 private:
-    uint64_t m_last_pc;
-    uint64_t m_repeated_count;
+    uint8_t  m_CRETE_MAX_LOOP_BLOCK;
+    uint16_t m_CRETE_LOOP_BOUND;
+    uint32_t m_CRETE_BLD_BUFF_SIZE;
+
+    uint64_t *m_pc_seq_buffer;
+    uint32_t m_psb_head;
+    boost::unordered_map<uint64_t, uint32_t> m_uniq_pc_count;
 
 public:
-    BlockLoopDetector();
+    BlockLoopDetector(uint8_t max_loop_block, uint16_t loop_bound);
     ~BlockLoopDetector();
 
     bool check(uint64_t current_pc);
@@ -310,7 +315,8 @@ private:
 
     // For ovmf coverage
     set<uint64_t> m_ovmf_pc;
-    BlockLoopDetector m_bld;
+    BlockLoopDetector m_bld_pre;
+    BlockLoopDetector m_bld_post;
 
 public:
 	RuntimeEnv();
@@ -394,7 +400,8 @@ public:
 
     // For ovmf coverage
     void addOvmfPc(uint64_t tb_pc);
-    bool checkBlockLoop(uint64_t tb_pc);
+    bool checkBlockLoopPreExec(uint64_t tb_pc);
+    bool checkBlockLoopPostExec(uint64_t tb_pc);
 
 private:
     void init_concolics();

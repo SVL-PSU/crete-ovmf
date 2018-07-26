@@ -72,7 +72,10 @@ RuntimeEnv::RuntimeEnv()
   m_streamed_tb_count(0), m_streamed_index(0),
   m_trace_tag_nodes_count(0),
   m_qemu_default_br_skipped(false),
-  m_new_tb(false)
+  m_new_tb(false),
+  // xxx: todo the bound here is arbitrary
+  m_bld_pre(5, 100),
+  m_bld_post(15, 100)
 {
     m_tlo_ctx_cpuState = new uint8_t [sizeof(CPUArchState)];
 
@@ -1685,43 +1688,73 @@ void RuntimeEnv::addOvmfPc(uint64_t tb_pc)
     m_ovmf_pc.insert(tb_pc);
 }
 
-bool RuntimeEnv::checkBlockLoop(uint64_t tb_pc)
+bool RuntimeEnv::checkBlockLoopPreExec(uint64_t tb_pc)
 {
-    return m_bld.check(tb_pc);
+    return m_bld_pre.check(tb_pc);
 }
 
-
-BlockLoopDetector::BlockLoopDetector()
-:m_last_pc(0),m_repeated_count(0)
+bool RuntimeEnv::checkBlockLoopPostExec(uint64_t tb_pc)
 {
-    ;
+    return m_bld_post.check(tb_pc);
+}
+
+BlockLoopDetector::BlockLoopDetector(uint8_t max_loop_block, uint16_t loop_bound)
+:m_CRETE_MAX_LOOP_BLOCK(max_loop_block), m_CRETE_LOOP_BOUND(loop_bound)
+{
+    m_CRETE_BLD_BUFF_SIZE = m_CRETE_MAX_LOOP_BLOCK * m_CRETE_LOOP_BOUND;
+    m_pc_seq_buffer = new uint64_t [m_CRETE_BLD_BUFF_SIZE]();
 }
 
 BlockLoopDetector::~BlockLoopDetector()
 {
-    ;
+    delete [] m_pc_seq_buffer;
 }
-
-
-// xxx: todo the bound here is arbitrary
-static const uint32_t CRETE_BLD_BOUND = 100;
 
 bool BlockLoopDetector::check(uint64_t current_pc)
 {
-    bool ret = true;
-    if(current_pc == m_last_pc)
+    assert(m_psb_head < m_CRETE_BLD_BUFF_SIZE);
+    assert(current_pc != 0);
+
+    uint64_t remove_pc = m_pc_seq_buffer[m_psb_head];
+
+    if(remove_pc != current_pc)
     {
-        ++m_repeated_count;
-        if(m_repeated_count > CRETE_BLD_BOUND)
+        // 1. Update 'm_pc_seq_buffer'
+        m_pc_seq_buffer[m_psb_head] = current_pc;
+
+        // 2. Decrease count for removed_pc
+        if(remove_pc != 0)
         {
-            ret = false;
+            assert(m_uniq_pc_count.find(remove_pc) != m_uniq_pc_count.end());
+            if(--m_uniq_pc_count[remove_pc] == 0)
+            {
+                m_uniq_pc_count.erase(remove_pc);
+            }
         }
-    } else {
-        m_last_pc = current_pc;
-        m_repeated_count = 0;
+
+        // 3. Increase count for current_pc
+        if(m_uniq_pc_count.find(current_pc) != m_uniq_pc_count.end())
+        {
+            ++m_uniq_pc_count[current_pc];
+        } else {
+            m_uniq_pc_count[current_pc] = 1;
+        }
     }
 
-    return ret;
+    // 4. Update 'm_psb_head'
+    if(++m_psb_head == m_CRETE_BLD_BUFF_SIZE)
+    {
+        m_psb_head = 0;
+    }
+
+    // 5. check for current_pc
+    assert(m_uniq_pc_count.find(current_pc) != m_uniq_pc_count.end());
+    if(m_uniq_pc_count[current_pc] < m_CRETE_LOOP_BOUND)
+    {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 CreteFlags::CreteFlags()
@@ -1827,7 +1860,7 @@ void crete_runtime_dump_close()
     }
 }
 
-static bool manual_code_selection_pre_exec(TranslationBlock *tb);
+static bool manual_code_selection_pre_exec(const TranslationBlock *tb);
 static bool manual_code_selection_post_exec();
 void crete_pre_cpu_tb_exec(void *qemuCpuState, TranslationBlock *tb)
 {
@@ -2012,6 +2045,11 @@ int crete_post_cpu_tb_exec(void *qemuCpuState, TranslationBlock *input_tb, uint6
 	    // 4. the current tb was rejected by manual_code_selection_post_exec();
 	    bool reverse = !is_current_tb_executed || !crete_tci_is_current_block_symbolic() ||
 	            (tb.pc == crete_interrupted_pc) || !manual_code_selection_post_exec();
+
+	    if(!reverse && !runtime_env->checkBlockLoopPostExec(tb.pc))
+	    {
+	        reverse = true;
+	    }
 
 	    if(reverse)
 	    {
@@ -2815,7 +2853,7 @@ inline static void adjust_trace_tag_tb_count(crete::creteTraceTag_ty &trace_tag,
     }
 }
 
-static bool manual_code_selection_pre_exec(TranslationBlock *tb)
+static bool manual_code_selection_pre_exec(const TranslationBlock *tb)
 {
     bool passed = true;
 
@@ -2823,7 +2861,7 @@ static bool manual_code_selection_pre_exec(TranslationBlock *tb)
 //    bool is_user_code = (tb->pc < KERNEL_CODE_START_ADDR);
 //    passed = passed && is_user_code;
 
-    passed = passed && runtime_env->checkBlockLoop(tb->pc);
+    passed = passed && runtime_env->checkBlockLoopPreExec(tb->pc);
 
     return passed;
 }
