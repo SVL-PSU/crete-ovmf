@@ -75,7 +75,9 @@ RuntimeEnv::RuntimeEnv()
   m_new_tb(false),
   // xxx: todo the bound here is arbitrary
   m_bld_pre(5, 100),
-  m_bld_post(15, 100)
+  m_bld_post(15, 100),
+  m_bld_pre_count(0),
+  m_bld_post_count(0)
 {
     m_tlo_ctx_cpuState = new uint8_t [sizeof(CPUArchState)];
 
@@ -1663,6 +1665,7 @@ void RuntimeEnv::writeGuestDataPostExec()
 {
     m_guest_data_post_exec.set_ovmf_pc(m_ovmf_pc);
     m_guest_data_post_exec.set_tc_issue_index(m_input_tc.get_issue_index());
+    m_guest_data_post_exec.set_bld_count(m_bld_pre_count, m_bld_post_count);
 
     ofstream o_sm(getOutputFilename(CRETE_FILENAME_GUEST_DATA_POST_EXEC).c_str(),
             ios_base::binary);
@@ -1690,12 +1693,26 @@ void RuntimeEnv::addOvmfPc(uint64_t tb_pc)
 
 bool RuntimeEnv::checkBlockLoopPreExec(uint64_t tb_pc)
 {
-    return m_bld_pre.check(tb_pc);
+    if(m_bld_pre.check(tb_pc))
+    {
+        return true;
+    }
+    else {
+        ++m_bld_pre_count;
+        return false;
+    }
 }
 
 bool RuntimeEnv::checkBlockLoopPostExec(uint64_t tb_pc)
 {
-    return m_bld_post.check(tb_pc);
+    if(m_bld_post.check(tb_pc))
+    {
+        return true;
+    }
+    else {
+        ++m_bld_post_count;
+        return false;
+    }
 }
 
 BlockLoopDetector::BlockLoopDetector(uint8_t max_loop_block, uint16_t loop_bound)

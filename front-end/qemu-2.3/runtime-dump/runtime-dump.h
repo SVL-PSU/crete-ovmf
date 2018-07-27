@@ -318,6 +318,9 @@ private:
     BlockLoopDetector m_bld_pre;
     BlockLoopDetector m_bld_post;
 
+    uint64_t m_bld_pre_count;
+    uint64_t m_bld_post_count;
+
 public:
 	RuntimeEnv();
 	~RuntimeEnv();

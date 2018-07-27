@@ -1180,7 +1180,7 @@ public:
     auto set_update_time_last_new_tb(const GuestDataPostExec& data) -> void;
     auto no_new_tb_time() -> uint64_t;
 
-    auto write_ovmf_pc(const GuestDataPostExec& data) -> void;
+    auto process_ovmf_info(const GuestDataPostExec& data) -> void;
 
     // +--------------------------------------------------+
     // + Entry & Exit                                     +
@@ -1568,7 +1568,7 @@ struct DispatchFSM_::dispatch
                     {
                         fsm.to_trace_pool(nfsm->get_trace());
                         fsm.set_update_time_last_new_tb(nfsm->get_guest_data_post_exec());
-                        fsm.write_ovmf_pc(nfsm->get_guest_data_post_exec());
+                        fsm.process_ovmf_info(nfsm->get_guest_data_post_exec());
                     }
                 }
                 else if(nfsm->is_flag_active<vm::flag::tx_test>())
@@ -2005,9 +2005,9 @@ auto DispatchFSM_::set_update_time_last_new_tb(const GuestDataPostExec& data) ->
     }
 }
 
-auto DispatchFSM_::write_ovmf_pc(const GuestDataPostExec& data) -> void
+auto DispatchFSM_::process_ovmf_info(const GuestDataPostExec& data) -> void
 {
-
+    // 1. write ovmf pc information
     auto p = root_ / dispatch_ovmf_dir_name / ("issued_tc_" + std::to_string(data.m_tc_issue_index) + ".txt");
 
     fs::ofstream ofs{p};
@@ -2023,6 +2023,14 @@ auto DispatchFSM_::write_ovmf_pc(const GuestDataPostExec& data) -> void
     }
 
     ofs.close();
+
+    // 2. log BlockLoopDetection info
+    if(data.m_bld_pre_count || data.m_bld_post_count)
+    {
+        node_error_log_ << "[BLD]: iussed_tc[" << std::dec << data.m_tc_issue_index
+                << "], pre_count = " << data.m_bld_pre_count
+                << ", post_count = " << data.m_bld_post_count << "\n";
+    }
 }
 
 

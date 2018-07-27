@@ -29,6 +29,8 @@ struct GuestDataPostExec
     vector<uint64_t> m_new_captured_tbs;
     set<uint64_t> m_ovmf_pc;
     uint64_t m_tc_issue_index;
+    uint64_t m_bld_pre_count;
+    uint64_t m_bld_post_count;
 
     GuestDataPostExec() {};
     ~GuestDataPostExec() {};
@@ -41,6 +43,8 @@ struct GuestDataPostExec
         ar & m_new_captured_tbs;
         ar & m_ovmf_pc;
         ar & m_tc_issue_index;
+        ar & m_bld_pre_count;
+        ar & m_bld_post_count;
     }
 
     void add_new_tb_pc(const uint64_t pc)
@@ -56,6 +60,12 @@ struct GuestDataPostExec
     void set_tc_issue_index(const uint64_t index)
     {
         m_tc_issue_index = index;
+    }
+
+    void set_bld_count(const uint64_t pre_count, const uint64_t post_count)
+    {
+        m_bld_pre_count = pre_count;
+        m_bld_post_count = post_count;
     }
 };
 
