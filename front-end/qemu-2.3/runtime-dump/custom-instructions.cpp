@@ -220,6 +220,18 @@ static inline void crete_tracing_reset()
     crete_tci_next_iteration();
 }
 
+// CRETE_INSTR_REPORT_EXCEPT_VALUE
+// TODO: xxx make it better with keeping traces so far
+// Report with prints and quit VM, from where vm-node should log the
+// VM quit with related information and test case
+static inline void crete_custom_instr_report_except()
+{
+    uint64_t excpet_indx = g_cpuState_bct->regs[R_EAX];
+
+    fprintf(stderr, "[Potential Bugs] Exception reported: excpet_indx = %lu.\n");
+    qemu_system_shutdown_request();
+}
+
 void crete_custom_instruction_handler(uint64_t arg) {
 	switch (arg) {
 	// xxx: to be removed
@@ -255,6 +267,8 @@ void crete_custom_instruction_handler(uint64_t arg) {
 	    crete_tracing_finish();
 	    crete_tracing_reset();
 	    break;
+	case CRETE_INSTR_REPORT_EXCEPT_VALUE:
+	    crete_custom_instr_report_except();
 // Add new custom instruction handler here
 
 	default:
