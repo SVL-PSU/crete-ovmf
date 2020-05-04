@@ -4,3 +4,6 @@
 [submodule "back-end/klee-1.4.0"]
 	path = back-end/klee-1.4.0
 	url = https://github.com/likebreath/klee.git
+[submodule "test/ovmf/edk2"]
+	path = test/ovmf/edk2
+	url = https://github.com/likebreath/edk2
